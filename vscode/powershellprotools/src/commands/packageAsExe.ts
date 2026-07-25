@@ -44,8 +44,32 @@ function makeDefaultPackageConfig(rootPath: string) {
     }
 }
 
+function getPackageRoot(packageManifest: string): string | undefined {
+    const packageConfig = fs.readFileSync(packageManifest, 'utf8');
+    const rootMatch = packageConfig.match(/^\s*Root\s*=\s*(['\"])(.*?)\1\s*(?:#.*)?$/m);
+    return rootMatch ? rootMatch[2] : undefined;
+}
+
+function updatePackageRoot(packageManifest: string, scriptPath: string): boolean {
+    const packageConfig = fs.readFileSync(packageManifest, 'utf8');
+    const updatedPackageConfig = packageConfig.replace(
+        /^(\s*Root\s*=\s*)(['\"])(.*?)\2(\s*(?:#.*)?)$/m,
+        `$1'${scriptPath.replace(/'/g, "''")}'$4`);
+
+    if (updatedPackageConfig === packageConfig) {
+        return false;
+    }
+
+    fs.writeFileSync(packageManifest, updatedPackageConfig);
+    return true;
+}
+
+function samePath(firstPath: string, secondPath: string): boolean {
+    return path.resolve(firstPath).toLowerCase() === path.resolve(secondPath).toLowerCase();
+}
+
 export function packageAsExe() {
-    return vscode.commands.registerCommand('powershell.packageAsExe', (resource) => {
+    return vscode.commands.registerCommand('powershell.packageAsExe', async (resource) => {
         if (!Container.IsInitialized()) return;
 
         var rootPath;
@@ -95,6 +119,32 @@ export function packageAsExe() {
             const defaultPackageConfig = makeDefaultPackageConfig(rootPath);
             fs.writeFileSync(packageManifest, defaultPackageConfig);
             vscode.window.showInformationMessage(`Created default package manifest at ${packageManifest} `);
+        }
+
+        const activeEditor = vscode.window.activeTextEditor;
+        const packageRoot = getPackageRoot(packageManifest);
+        if (activeEditor && packageRoot && activeEditor.document.uri.fsPath.toLowerCase().endsWith('.ps1')) {
+            const activeScriptPath = activeEditor.document.uri.fsPath;
+            const packageRootPath = path.isAbsolute(packageRoot)
+                ? packageRoot
+                : path.join(path.dirname(packageManifest), packageRoot);
+
+            if (!samePath(packageRootPath, activeScriptPath)) {
+                const useManifestRoot = `Use package manifest root (${packageRoot})`;
+                const useActiveScript = `Use active script (${path.basename(activeScriptPath)})`;
+                const selection = await vscode.window.showQuickPick([useManifestRoot, useActiveScript], {
+                    placeHolder: 'The package manifest targets a different script. Which script should be packaged?'
+                });
+
+                if (!selection) {
+                    return;
+                }
+
+                if (selection === useActiveScript && !updatePackageRoot(packageManifest, activeScriptPath)) {
+                    vscode.window.showWarningMessage(`Unable to update the Root value in ${packageManifest}.`);
+                    return;
+                }
+            }
         }
 
         Container.PowerShellService.Package(packageManifest);
