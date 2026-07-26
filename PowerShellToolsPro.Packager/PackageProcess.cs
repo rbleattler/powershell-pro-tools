@@ -17,6 +17,7 @@ namespace PowerShellToolsPro.Packager
             _stages = new Stage[]
             {
                 new ValidateStage(),
+                new RootPathStage(),
                 new OutputPathStage(),
                 new BundleStage(),
                 new CompileStage(),
@@ -267,6 +268,24 @@ namespace PowerShellToolsPro.Packager
             }
 
             process.Config.OutputPath = outputDirectory;
+
+            return Success(process.Script);
+        }
+    }
+
+    public class RootPathStage : Stage
+    {
+        public override bool ShouldExecute(PackageProcess process, StageResult previousStage)
+        {
+            return true;
+        }
+
+        public override StageResult Execute(PackageProcess process, StageResult previousStage)
+        {
+            if (!string.IsNullOrEmpty(process.Config.Root) && !Path.IsPathRooted(process.Config.Root))
+            {
+                process.Config.Root = Path.Combine(Environment.CurrentDirectory, process.Config.Root);
+            }
 
             return Success(process.Script);
         }
