@@ -64,5 +64,21 @@ $resources = Invoke-Expression (Get-Content ""$PSScriptRoot\MultiThreadedForm.De
             Assert.Equal("System.ComponentModel.ComponentResourceManager", objectCreate.CreateType.BaseType);
             Assert.Equal("MainForm", (objectCreate.Parameters[0] as CodeTypeOfExpression).Type.BaseType);
         }
+
+        [Fact]
+        public void ShouldNotGenerateRedundantCasts()
+        {
+            var generator = new PowerShellCodeGenerator(null, EventGenerationType.Variable);
+            var expression = new CodeCastExpression(typeof(int),
+                new CodeCastExpression(typeof(byte),
+                    new CodeCastExpression(typeof(byte), new CodePrimitiveExpression((byte)192))));
+
+            using (var writer = new StringWriter())
+            {
+                generator.GenerateCodeFromExpression(expression, writer, null);
+
+                Assert.Equal("([System.Int32][System.Byte]192)", writer.ToString());
+            }
+        }
     }
 }
