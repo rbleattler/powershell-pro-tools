@@ -1,5 +1,8 @@
 ﻿using PowerShellToolsPro.Packager.Config;
+using System;
 using System.Collections;
+using System.IO;
+using PowerShellToolsPro.Packager;
 using Xunit;
 
 namespace PowerShellToolsPro.Packager.Test
@@ -40,6 +43,17 @@ namespace PowerShellToolsPro.Packager.Test
             var config = deserializer.Deserialize(hashtable);
 
             Assert.Equal("http://timestamp.digicert.com", config.Package.TimestampServer);
+        }
+
+        [Fact]
+        public void ShouldResolveRelativeRootAgainstWorkingDirectory()
+        {
+            var process = new PackageProcess();
+            process.Config.Root = @"scripts\entry.ps1";
+
+            new RootPathStage().Execute(process, null);
+
+            Assert.Equal(Path.Combine(Environment.CurrentDirectory, @"scripts\entry.ps1"), process.Config.Root);
         }
     }
 
