@@ -611,10 +611,32 @@ namespace PowerShellToolsPro.FormsDesigner
 
 		private void GenerateCodeFromCodeCastExpression(CodeCastExpression e, TextWriter w, CodeGeneratorOptions o)
 	    {
+			while (e.Expression is CodeCastExpression && TypesMatch(e.TargetType, ((CodeCastExpression)e.Expression).TargetType))
+			{
+				e = (CodeCastExpression)e.Expression;
+			}
+
+			var primitive = e.Expression as CodePrimitiveExpression;
+			if (primitive != null && primitive.Value != null && TypesMatch(e.TargetType, primitive.Value.GetType()))
+			{
+				GenerateCodeFromPrimitiveExpression(primitive, w, o);
+				return;
+			}
+
 			w.Write("([" + e.TargetType.BaseType + "]");
 			GenerateCodeFromExpression(e.Expression, w, o);
 			w.Write(")");
 	    }
+
+		private static bool TypesMatch(CodeTypeReference typeReference, Type type)
+		{
+			return typeReference.BaseType.Equals(type.FullName, StringComparison.Ordinal);
+		}
+
+		private static bool TypesMatch(CodeTypeReference left, CodeTypeReference right)
+		{
+			return left.BaseType.Equals(right.BaseType, StringComparison.Ordinal);
+		}
 
         private void GenerateCodeFromCodeAttachEventStatement(CodeAttachEventStatement e, TextWriter w,
             CodeGeneratorOptions o)
